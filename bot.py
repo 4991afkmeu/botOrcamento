@@ -8,7 +8,7 @@ from pdf_template.template import criar_pdf_dados
 
 
 
-TOKEN = os.getenv("TOKEN")
+TOKEN = "8249617232:AAFoLpF0FuqoLmmtOW4MdgMXC9WrjZlQVFg"
 
 def _to_float(br_number: str) -> float:
     """Aceita '0.30', '0,30' etc."""
