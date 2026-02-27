@@ -61,63 +61,106 @@ def _draw_table_header(c, y):
 def _format_money(v):
     return f"R$ {v:.2f}"
 
+def _draw_table_header_produtos(c, y):
+    c.setFillColor(colors.HexColor("#333333"))
+    c.rect(2*cm, y - 0.35*cm, 17*cm, 0.85*cm, fill=True, stroke=False)
+
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(2.2*cm, y, "Produto / Serviço")
+    c.drawRightString(10*cm, y, "Qtd")
+    c.drawRightString(14*cm, y, "Valor Unit.")
+    c.drawRightString(19*cm, y, "Total (R$)")
+
+
 # --- API principal ---
 
 def criar_pdf_dados(dados, caminho_arquivo):
-    """
-    dados: {
-      'itens': [
-        {'medida': '0.30x0.50', 'quantidade': 4, 'preco_m2': 120.0, 'area': 0.60, 'total': 72.0},
-        ...
-      ]
-    }
-    """
     c = canvas.Canvas(caminho_arquivo, pagesize=A4)
     largura, altura = A4
 
-    # Fundo claro
     c.setFillColorRGB(0.97, 0.97, 0.97)
     c.rect(0, 0, largura, altura, fill=1, stroke=0)
 
-    # Cabeçalho
     _draw_header(c, largura, altura)
 
-    # Tabela
     y = altura - 7.2*cm
-    _draw_table_header(c, y)
-    y -= 0.9*cm
-
     total_geral = 0.0
-    c.setFont("Helvetica", 11)
 
-    for i, item in enumerate(dados.get("itens", [])):
-        # quebra de página
-        if y < 3.5*cm:
-            c.showPage()
-            c.setFillColorRGB(0.97, 0.97, 0.97)
-            c.rect(0, 0, largura, altura, fill=1, stroke=0)
-            _draw_header(c, largura, altura)
-            y = altura - 7.2*cm
-            _draw_table_header(c, y)
-            y -= 0.9*cm
-            c.setFont("Helvetica", 11)
-
-        # linha zebrada
-        if i % 2 == 0:
-            c.setFillColor(colors.HexColor("#F2F2F2"))
-            c.rect(2*cm, y - 0.32*cm, 17*cm, 0.64*cm, fill=True, stroke=False)
-
+    # ================== ITENS POR MEDIDA ==================
+    itens_medida = dados.get("itens_medida", [])
+    if itens_medida:
+        c.setFont("Helvetica-Bold", 14)
         c.setFillColor(colors.black)
-        c.drawString(2.2*cm, y, item["medida"])
-        c.drawRightString(8*cm, y, str(item["quantidade"]))
-        c.drawRightString(12*cm, y, f"{item['preco_m2']:.2f}")
-        c.drawRightString(16*cm, y, f"{item['area']:.2f}")
-        c.drawRightString(19*cm, y, f"{item['total']:.2f}")
+        c.drawString(2*cm, y, "Itens por Medida (m²)")
+        y -= 0.6*cm
 
-        total_geral += float(item["total"])
-        y -= 0.65*cm
+        _draw_table_header(c, y)
+        y -= 0.9*cm
+        c.setFont("Helvetica", 11)
 
-    # ------------------ TOTAL GERAL ------------------
+        for i, item in enumerate(itens_medida):
+            if y < 3.5*cm:
+                c.showPage()
+                c.setFillColorRGB(0.97, 0.97, 0.97)
+                c.rect(0, 0, largura, altura, fill=1, stroke=0)
+                _draw_header(c, largura, altura)
+                y = altura - 7.2*cm
+                _draw_table_header(c, y)
+                y -= 0.9*cm
+
+            if i % 2 == 0:
+                c.setFillColor(colors.HexColor("#F2F2F2"))
+                c.rect(2*cm, y - 0.32*cm, 17*cm, 0.64*cm, fill=True, stroke=False)
+
+            c.setFillColor(colors.black)
+            c.drawString(2.2*cm, y, item["medida"])
+            c.drawRightString(8*cm, y, str(item["quantidade"]))
+            c.drawRightString(12*cm, y, f"{item['preco_m2']:.2f}")
+            c.drawRightString(16*cm, y, f"{item['area']:.2f}")
+            c.drawRightString(19*cm, y, f"{item['total']:.2f}")
+
+            total_geral += item["total"]
+            y -= 0.65*cm
+
+        y -= 0.8*cm
+
+    # ================== PRODUTOS / SERVIÇOS ==================
+    itens_produto = dados.get("itens_produto", [])
+    if itens_produto:
+        c.setFont("Helvetica-Bold", 14)
+        c.setFillColor(colors.black)
+        c.drawString(2*cm, y, "Produtos / Serviços")
+        y -= 0.6*cm
+
+        _draw_table_header_produtos(c, y)
+        y -= 0.9*cm
+        c.setFont("Helvetica", 11)
+
+        for i, item in enumerate(itens_produto):
+            if y < 3.5*cm:
+                c.showPage()
+                c.setFillColorRGB(0.97, 0.97, 0.97)
+                c.rect(0, 0, largura, altura, fill=1, stroke=0)
+                _draw_header(c, largura, altura)
+                y = altura - 7.2*cm
+                _draw_table_header_produtos(c, y)
+                y -= 0.9*cm
+
+            if i % 2 == 0:
+                c.setFillColor(colors.HexColor("#F2F2F2"))
+                c.rect(2*cm, y - 0.32*cm, 17*cm, 0.64*cm, fill=True, stroke=False)
+
+            c.setFillColor(colors.black)
+            c.drawString(2.2*cm, y, item["produto"])
+            c.drawRightString(10*cm, y, str(item["quantidade"]))
+            c.drawRightString(14*cm, y, f"{item['valor_unit']:.2f}")
+            c.drawRightString(19*cm, y, f"{item['total']:.2f}")
+
+            total_geral += item["total"]
+            y -= 0.65*cm
+
+    # ================== TOTAL GERAL ==================
     if y < 4*cm:
         c.showPage()
         c.setFillColorRGB(0.97, 0.97, 0.97)
@@ -125,20 +168,20 @@ def criar_pdf_dados(dados, caminho_arquivo):
         _draw_header(c, largura, altura)
         y = altura - 7.2*cm
 
-    y -= 0.6*cm
+    y -= 0.8*cm
     c.setFont("Helvetica-Bold", 16)
     c.setFillColor(colors.HexColor("#FF5733"))
     c.drawRightString(19*cm, y, f"TOTAL GERAL: {_format_money(total_geral)}")
 
-    # ------------------ FORMAS DE PAGAMENTO ------------------
+    # ================== PAGAMENTO ==================
     y -= 1*cm
     c.setFont("Helvetica-Bold", 11)
     c.setFillColor(colors.black)
     c.drawString(2*cm, y, "Formas de pagamento: Dinheiro, Cartão de crédito/débito e Pix")
 
-    # ------------------ RODAPÉ COM REDES SOCIAIS ------------------
+    # ================== RODAPÉ ==================
     rodape_altura = 2 * cm
-    c.setFillColorRGB(0.15, 0.15, 0.15)  # fundo escuro
+    c.setFillColorRGB(0.15, 0.15, 0.15)
     c.rect(0, 0, largura, rodape_altura, stroke=0, fill=1)
 
     c.setFillColor(colors.white)
@@ -149,3 +192,4 @@ def criar_pdf_dados(dados, caminho_arquivo):
     c.drawString(2 * cm, 0.3 * cm, "Siga no Instagram para conhecer melhor nosso trabalho")
 
     c.save()
+

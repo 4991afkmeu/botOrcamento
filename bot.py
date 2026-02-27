@@ -44,6 +44,25 @@ def _parse_line(line: str):
         "area": area_total,
         "total": total_item
     }
+def _parse_produto(line: str):
+    # Ex.: "Película fumê, 120, 6"
+    partes = [p.strip() for p in line.split(",")]
+
+    if len(partes) != 3:
+        raise ValueError("Formato inválido. Use: PRODUTO, VALOR_UNITÁRIO, QUANTIDADE")
+
+    nome = partes[0]
+    valor_unit = _to_float(partes[1])
+    quantidade = int(partes[2])
+
+    total = valor_unit * quantidade
+
+    return {
+        "produto": nome,
+        "quantidade": quantidade,
+        "valor_unit": valor_unit,
+        "total": total
+    }
 def calcular_totais(itens):
     """
     Recebe a lista de itens e retorna:
@@ -69,51 +88,56 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def processar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         linhas = [l for l in update.message.text.splitlines() if l.strip()]
-        itens = []
+        itens_medida = []
+        itens_produto = []
         erros = []
 
         for ln in linhas:
             try:
-                itens.append(_parse_line(ln))
+                if "x" in ln.lower():
+                    itens_medida.append(_parse_line(ln))
+                else:
+                    itens_produto.append(_parse_produto(ln))
             except Exception as e:
                 erros.append(f"Erro na linha '{ln}': {e}")
 
-        if not itens:
-            raise ValueError("Nenhuma linha válida para processar \n"
-                             "Envie uma ou mais linhas no formato:\n"
-                             "ALTURAxLARGURA, QUANTIDADE, PREÇO_M2\n"
-                             "Exemplo:\n"
-                             "0.30x0.50, 4, 120\n"
-                             "1,00x2,00, 2, 150 ❗"
-                             )
+        if not itens_medida and not itens_produto:
+            raise ValueError("Nenhuma linha válida para processar.")
 
         dados = {
             "data": datetime.now().strftime("%d/%m/%Y"),
-            "itens": itens
+            "itens_medida": itens_medida,
+            "itens_produto": itens_produto
         }
 
         caminho_pdf = "orcamento.pdf"
         criar_pdf_dados(dados, caminho_pdf)
 
-        # Calcula totais
-        total_itens, total_m2, total_geral = calcular_totais(itens)
+        total_geral = 0
+
+        if itens_medida:
+            _, _, total_medidas = calcular_totais(itens_medida)
+            total_geral += total_medidas
+
+        if itens_produto:
+            total_produtos = sum(i["total"] for i in itens_produto)
+            total_geral += total_produtos
+
         with open(caminho_pdf, "rb") as f:
-            await update.message.reply_text(f"✅ PDF de orçamento gerado com sucesso!")
-
-            await update.message.reply_document(document=InputFile(f, filename="orcamento.pdf"))
-
-            await update.message.reply_text(
-                f"📊 Totais:\n"
-                f"Itens: {total_itens}\n"
-                f"Área total: {total_m2:.2f} m²\n"
-                f"Valor total: R$ {total_geral:.2f}"
+            await update.message.reply_document(
+                document=InputFile(f, filename="orcamento.pdf")
             )
 
+        await update.message.reply_text(
+            f"💰 Valor total do orçamento: R$ {total_geral:.2f}"
+        )
+
         if erros:
-            await update.message.reply_text(f"❗Algumas linhas tiveram erro:\n" + "\n".join(erros))
+            await update.message.reply_text("❗Erros encontrados:\n" + "\n".join(erros))
 
     except Exception as e:
-        await update.message.reply_text(f" ❗ Erro: {e}")
+        await update.message.reply_text(f"❗ Erro: {e}")
+
 
 async def teste(update: Update, context: ContextTypes.DEFAULT_TYPE):
     dados = []
