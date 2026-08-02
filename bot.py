@@ -1,4 +1,4 @@
-# Bot version 1.0.2
+#version 1.0.2
 import json
 import os
 import random
