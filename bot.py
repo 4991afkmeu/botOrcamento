@@ -8,7 +8,43 @@ from pdf_template.template import criar_pdf_dados
 
 
 
-TOKEN = "8249617232:AAFoLpF0FuqoLmmtOW4MdgMXC9WrjZlQVFg"
+with open("config.json") as f:
+    TOKEN = json.load(f)["token"]
+
+CONFIG_FILE = "config.json"
+
+
+CONFIG_PADRAO = {
+    "nome": "Lucas Film",
+    "subtitulo": "Películas residencial e automotivas",
+    "endereco": "Avenida Theonas Martins Gomes, 369, Mangueirinha, Rio Bonito",
+    "telefone": "(21) 9 9495-9893",
+    "instagram": "@lucas.filmss"
+}
+
+
+def carregar_config():
+    if not os.path.exists(CONFIG_FILE):
+        salvar_config(CONFIG_PADRAO)
+
+    try:
+        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+            config = json.load(f)
+
+        # Garante que novas configurações sejam adicionadas
+        for chave, valor in CONFIG_PADRAO.items():
+            if chave not in config:
+                config[chave] = valor
+
+        return config
+
+    except Exception:
+        return CONFIG_PADRAO.copy()
+
+
+def salvar_config(config):
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump(config, f, ensure_ascii=False, indent=4)
 
 def _to_float(br_number: str) -> float:
     """Aceita '0.30', '0,30' etc."""
@@ -165,20 +201,136 @@ async def teste(update: Update, context: ContextTypes.DEFAULT_TYPE):
     caminho_pdf = "teste_aleatorio.pdf"
     criar_pdf_dados({"data": datetime.now().strftime("%d/%m/%Y"), "itens": dados}, caminho_pdf)
 
-    # envia PDF para o usuário
+async def alterar(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        texto = update.message.text.strip()
+
+        # Remove "!alterar"
+        comando = texto[len("!alterar"):].strip()
+
+        if not comando:
+            await update.message.reply_text(
+                "❗ Use:\n\n"
+                "!alterar campo novo_valor\n\n"
+                "Campos disponíveis:\n"
+                "• nome\n"
+                "• subtitulo\n"
+                "• endereco\n"
+                "• telefone\n"
+                "• instagram\n\n"
+                "Exemplo:\n"
+                "!alterar endereco Rua das Flores, 100, Rio Bonito"
+            )
+            return
+
+        partes = comando.split(" ", 1)
+
+        campo = partes[0].lower()
+
+        campos_validos = [
+            "nome",
+            "subtitulo",
+            "endereco",
+            "telefone",
+            "instagram"
+        ]
+
+        if campo not in campos_validos:
+            await update.message.reply_text(
+                f"❌ Campo '{campo}' não existe.\n\n"
+                "Campos disponíveis:\n"
+                "nome\n"
+                "subtitulo\n"
+                "endereco\n"
+                "telefone\n"
+                "instagram"
+            )
+            return
+
+        # Se o usuário colocou apenas "!alterar endereco",
+        # o campo será apagado.
+        if len(partes) == 1:
+            novo_valor = ""
+        else:
+            novo_valor = partes[1].strip()
+
+        config = carregar_config()
+
+        valor_anterior = config.get(campo, "")
+
+        config[campo] = novo_valor
+
+        salvar_config(config)
+
+        await update.message.reply_text(
+            f"✅ Configuração alterada!\n\n"
+            f"Campo: {campo}\n"
+            f"Anterior: {valor_anterior or '(vazio)'}\n"
+            f"Novo: {novo_valor or '(vazio)'}"
+        )
+
+    except Exception as e:
+        await update.message.reply_text(
+            f"❌ Erro ao alterar configuração:\n{e}"
+        )
+
+async def config(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        dados = carregar_config()
+
+        mensagem = (
+            "⚙️ CONFIGURAÇÕES ATUAIS\n\n"
+            f"Nome: {dados['nome']}\n"
+            f"Subtítulo: {dados['subtitulo']}\n"
+            f"Endereço: {dados['endereco']}\n"
+            f"Telefone: {dados['telefone']}\n"
+            f"Instagram: {dados['instagram']}"
+        )
+
+        await update.message.reply_text(mensagem)
+
+    except Exception as e:
+        await update.message.reply_text(
+            f"❌ Erro ao carregar configurações: {e}"
+        )
+# envia PDF para o usuário
     with open(caminho_pdf, "rb") as f:
         await update.message.reply_document(document=InputFile(f, filename="teste_aleatorio.pdf"))
 
-    # mensagem com total geral
-    await update.message.reply_text(f"✅ PDF de teste gerado com 50 itens.\nTotal geral: R$ {total_geral:.2f}")
+        # mensagem com total geral
+        await update.message.reply_text(f"✅ PDF de teste gerado com 50 itens.\nTotal geral: R$ {total_geral:.2f}")
 
 if __name__ == "__main__":
-    from telegram.ext import ApplicationBuilder
-    import asyncio
     app = ApplicationBuilder().token(TOKEN).build()
 
+    # Comandos normais
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, processar))
     app.add_handler(CommandHandler("teste", teste))
-    print("Bot rodando no railway...")
+
+    # Comandos de configuração
+    # DEVEM vir antes do processar()
+    app.add_handler(
+        MessageHandler(
+            filters.Regex(r"^!alterar(?:\s|$)"),
+            alterar
+        )
+    )
+
+    app.add_handler(
+        MessageHandler(
+            filters.Regex(r"^!config$"),
+            config
+        )
+    )
+
+    # Orçamentos
+    # Deve ser o último handler de texto
+    app.add_handler(
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND,
+            processar
+        )
+    )
+
+    print("Bot rodando...")
     app.run_polling()
